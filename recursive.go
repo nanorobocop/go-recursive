@@ -5,106 +5,131 @@ import (
 	"reflect"
 )
 
-// WalkFunc is function that will be invoked during walking for each element.
+// WalkFunc is function that will be invoked during walking.
 // Arguments:
-// level - nested level, starting 0
 // value - currently walking value
-// retValue - new value to update existing value
-type WalkFunc func(level int, value interface{}) (retValue interface{})
+// level - nested level, starting with 0
+// Return value is new value to update existing value, or NoUpdate{} if update not needed
+type WalkFunc func(value interface{}, level int) (updateVal interface{})
 
 // NoUpdate specifies that there's no update to existing value.
-// It's distinguish from nil to allow setting nil to value.
+// It's distinguished from nil to allow setting nil to value.
 type NoUpdate struct{}
 
-func PrintWalkFunc(level int, value interface{}) (retValue interface{}) {
-	vv := reflect.ValueOf(value)
-	kind := vv.Type().Kind().String()
-	fmt.Printf("%s%s\n", indent(level), kind)
-	return NoUpdate{}
-}
+// Walker contains walking options
+type Walker struct {
+	// level is nested level, starting from 0
+	level int
 
-func PrintLeafFunc(level int, value interface{}) (retValue interface{}) {
-	fmt.Printf("%s%v\n", indent(level), value)
-	return NoUpdate{}
-}
-
-func indent(level int) (indent string) {
-	for i := 0; i < level; i++ {
-		indent += ">>>>"
-	}
-	return
-}
-
-// WalkOpts defines walking options.
-// It could be empty struct at the beginning.
-type WalkOpts struct {
-	// Level is nested level, keep 0 at the beginning
-	Level int
-
-	// WalkFunc is function that will be invoked at every Walk invokaction
+	// WalkFunc is function that will be invoked at every Walk invocation
 	WalkFunc WalkFunc
 
-	// LeafFunc is func that will be invoked on for every leaf element (if not struct, map or slice)
-	LeafFunc WalkFunc
+	// NodeOnly will cause WalkFunc to be invoked only for node elements (struct, map, slice).
+	// Self-exclusive with LeafOnly.
+	NodeOnly bool
 
-	// NodeFunc is func that will be invoked only for node element (not struct, map or slice)
-	NodeFunc WalkFunc
+	// LeafOnly will cause WalkFunc to be invoked only for leaf elements.
+	// Self-exclusive with NodeOnly.
+	LeafOnly bool
 }
 
-func (o *WalkOpts) Inc() *WalkOpts {
-	o2 := &WalkOpts{}
-	*o2 = *o
-	o2.Level++
-	return o2
-}
-
-// Walk walks through nested object recursively and invokes f.
-// It looks inside structs, maps, slices.
-func Walk(v interface{}, opts *WalkOpts) interface{} {
-	vv := reflect.ValueOf(v)
-
-	if opts.WalkFunc != nil {
-		opts.WalkFunc(opts.Level, v)
+func NewWalker(f WalkFunc) (*Walker, error) {
+	if f == nil {
+		return nil, fmt.Errorf("WalkFunc cannot be nil")
 	}
 
-	switch vv.Type().Kind().String() {
-	case "struct":
+	return &Walker{WalkFunc: f}, nil
+}
+
+// Go walks through nested object recursively and invokes WalkFunc.
+// It looks inside structs, maps, slices.
+func (w *Walker) Go(v interface{}) interface{} {
+	vv := reflect.ValueOf(v)
+
+	kind := vv.Type().Kind()
+
+	if kindOf(NodeKinds, kind) && w.LeafOnly == false {
+		w.WalkFunc(v, w.level)
+	} else if kindOf(LeafKinds, kind) && w.NodeOnly == false {
+		w.WalkFunc(v, w.level)
+	} else {
+		return NoUpdate{}
+	}
+
+	w.level++
+	defer func() { w.level-- }()
+
+	switch kind {
+	case reflect.Struct:
 		num := vv.Type().NumField()
 		for i := 0; i < num; i++ {
 			if !vv.Field(i).CanInterface() {
 				continue
 			}
-			Walk(vv.Field(i).Interface(), opts.Inc())
+
+			w.Go(vv.Field(i).Interface())
 		}
-	case "map":
-		kind := vv.Type().Elem().Kind().String()
-		if kind != "struct" &&
-			kind != "map" &&
-			kind != "slice" {
-			return nil
-		}
+	case reflect.Map:
 
 		iter := vv.MapRange()
 		for iter.Next() {
 			//k := iter.Key()
 			v := iter.Value()
-			Walk(v, opts.Inc())
-		}
-	case "slice":
-		kind := vv.Type().Elem().Kind().String()
-		if kind != "struct" &&
-			kind != "map" &&
-			kind != "slice" {
-			return nil
-		}
+			if !v.CanInterface() {
+				continue
+			}
 
+			w.Go(v.Interface())
+		}
+	case reflect.Slice:
 		n := vv.Len()
 		for i := 0; i < n; i++ {
-			Walk(vv.Index(i), opts.Inc())
+			elem := vv.Index(i)
+			if !elem.CanInterface() {
+				continue
+			}
+
+			w.Go(elem.Interface())
 		}
 	default:
-		opts.WalkFunc(opts.Level, v)
 	}
 
 	return nil
+}
+
+var (
+	LeafKinds = []reflect.Kind{reflect.Bool,
+		reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Uintptr,
+		reflect.Float32,
+		reflect.Float64,
+		reflect.Complex64,
+		reflect.Complex128,
+		reflect.Func,
+		reflect.Interface,
+		reflect.String}
+
+	NodeKinds = []reflect.Kind{reflect.Map,
+		reflect.Slice,
+		reflect.Struct}
+
+	PointerKind = []reflect.Kind{reflect.Ptr}
+)
+
+func kindOf(kinds []reflect.Kind, kind reflect.Kind) bool {
+	for _, k := range kinds {
+		if kind == k {
+			return true
+		}
+	}
+	return false
 }
