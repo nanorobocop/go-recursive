@@ -7,16 +7,17 @@ import (
 
 // WalkFunc is function that will be invoked during walking.
 // Arguments:
-// value - currently walking value
-// level - nested level, starting with 0
-// Return value is new value to update existing value, or NoUpdate{} if update not needed
+// * value - currently walking value
+// * level - nested level, starting with 0
+// Return value - new value to update existing value, or NoUpdate{} if update not needed
 type WalkFunc func(value interface{}, level int) (updateVal interface{})
 
 // NoUpdate specifies that there's no update to existing value.
 // It's distinguished from nil to allow setting nil to value.
 type NoUpdate struct{}
 
-// Walker contains walking options
+// Walker is main struct for recursive walking.
+// It contains walking options.
 type Walker struct {
 	// level is nested level, starting from 0
 	level int
