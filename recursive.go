@@ -44,17 +44,25 @@ func NewWalker(f WalkFunc) (*Walker, error) {
 
 // Go walks through nested object recursively and invokes WalkFunc.
 // It looks inside structs, maps, slices.
-func (w *Walker) Go(v interface{}) interface{} {
-	vv := reflect.ValueOf(v)
+func (w *Walker) Go(v interface{}) (ret interface{}) {
+	ret = NoUpdate{}
 
+	vv := reflect.ValueOf(v)
 	kind := vv.Type().Kind()
 
+	if kindOf(LeafKinds, kind) {
+		if w.NodeOnly == false {
+			ret = w.WalkFunc(v, w.level)
+		}
+
+		return ret
+	}
+
 	if kindOf(NodeKinds, kind) && w.LeafOnly == false {
-		w.WalkFunc(v, w.level)
-	} else if kindOf(LeafKinds, kind) && w.NodeOnly == false {
-		w.WalkFunc(v, w.level)
-	} else {
-		return NoUpdate{}
+		ret = w.WalkFunc(v, w.level)
+		if !reflect.DeepEqual(ret, NoUpdate{}) {
+			return ret
+		}
 	}
 
 	w.level++
@@ -68,10 +76,16 @@ func (w *Walker) Go(v interface{}) interface{} {
 				continue
 			}
 
-			w.Go(vv.Field(i).Interface())
+			ret := w.Go(vv.Field(i).Interface())
+			if reflect.DeepEqual(ret, NoUpdate{}) {
+				continue
+			}
+
+			if vv.Field(i).CanSet() {
+				vv.Field(i).Set(reflect.ValueOf(ret))
+			}
 		}
 	case reflect.Map:
-
 		iter := vv.MapRange()
 		for iter.Next() {
 			//k := iter.Key()
@@ -92,10 +106,9 @@ func (w *Walker) Go(v interface{}) interface{} {
 
 			w.Go(elem.Interface())
 		}
-	default:
 	}
 
-	return nil
+	return NoUpdate{}
 }
 
 var (
