@@ -13,7 +13,7 @@ import (
 type WalkFunc func(value interface{}, level int) (updateVal interface{})
 
 // NoUpdate specifies that there's no update to existing value.
-// It's distinguished from nil to allow setting nil to value.
+// It's distinguished from nil to allow setting nil as value.
 type NoUpdate struct{}
 
 // Walker is main struct for recursive walking.
