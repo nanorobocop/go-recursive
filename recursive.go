@@ -8,12 +8,8 @@ import (
 // Arguments:
 // * value - currently walking value
 // * level - nested level, starting with 0
-// Return value - new value to update existing value, or NoUpdate{} if update not needed
+// Return value - new value to update existing value, return original value if update not needed
 type WalkFunc func(value interface{}, level int) (ret interface{})
-
-// NoUpdate specifies that there's no update to existing value.
-// It's distinguished from nil to allow setting nil as value.
-type NoUpdate struct{}
 
 var emptyValue = reflect.Value{}
 
