@@ -47,20 +47,6 @@ func Go(obj interface{}, f WalkFunc) {
 func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 	kind := elem.Kind()
 
-	elem2 := elem
-
-	for {
-		if kind == reflect.Interface {
-			elem2 = elem2.Elem()
-			kind = elem2.Kind()
-			if elem2.CanAddr() {
-				elem = elem2
-			}
-		} else {
-			break
-		}
-	}
-
 	if kindOf(LeafKinds, kind) && w.NodeOnly == false {
 		orig := elem.Interface()
 		ret := w.WalkFunc(orig, w.level)
@@ -83,10 +69,31 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 	}
 
 	switch kind {
-	case reflect.Struct:
-		w.level++
-		defer func() { w.level-- }()
+	case reflect.Interface:
+		elem = elem.Elem()
+		ret, changed := w.GoValue(elem)
+		if !changed {
+			return emptyValue, false
+		}
 
+		if elem.CanSet() {
+			elem.Set(ret)
+			return emptyValue, false
+		}
+		return ret, true
+	case reflect.Ptr:
+		if elem.IsZero() {
+			break
+		}
+		val := elem.Elem()
+		w.GoValue(val)
+	}
+
+	w.level++
+	defer func() { w.level-- }()
+
+	switch kind {
+	case reflect.Struct:
 		var newElemPtr reflect.Value
 
 		num := elem.NumField()
@@ -118,8 +125,6 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 		}
 		return emptyValue, false
 	case reflect.Map:
-		w.level++
-		defer func() { w.level-- }()
 		iter := elem.MapRange()
 		for iter.Next() {
 			key := iter.Key()
@@ -137,8 +142,6 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 			elem.SetMapIndex(key, ret)
 		}
 	case reflect.Slice:
-		w.level++
-		defer func() { w.level-- }()
 		n := elem.Len()
 		for i := 0; i < n; i++ {
 			val := elem.Index(i)
@@ -153,12 +156,6 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 
 			val.Set(ret)
 		}
-	case reflect.Ptr:
-		if elem.IsZero() {
-			break
-		}
-		val := elem.Elem()
-		w.GoValue(val)
 	}
 
 	return reflect.Value{}, false
