@@ -3,15 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"reflect"
 	"testing"
-	//"os"
 )
 
 var (
-	w   io.ReadWriter
+	w   = &bytes.Buffer{}
 	str = "str"
 )
 
@@ -26,13 +24,9 @@ type SimpleStruct2 struct {
 	I int
 }
 
-type MultitypeStruct struct {
+type ComplexStruct struct {
 	SimpleStruct               // embedded struct
 	A            SimpleStruct2 // nested struct
-	B            bool
-	I            int
-	S            string
-	X            *string
 }
 
 func indent(level int) (indent string) {
@@ -47,43 +41,24 @@ func indent(level int) (indent string) {
 	return
 }
 
-func printWalkFunc(value interface{}, level int) (updateVal interface{}) {
-	vv := reflect.ValueOf(value)
-	kind := vv.Type().Kind().String()
-	out := fmt.Sprintf("%s%+v (%s)\n", indent(level), value, kind)
-	fmt.Fprintf(w, out)
-	return NoUpdate{}
-}
-
-func comparePrint(t *testing.T, value interface{}, expected string) {
-	w = &bytes.Buffer{}
-	walker, _ := NewWalker(printWalkFunc)
-	walker.Go(value)
-	a, _ := ioutil.ReadAll(w)
-	actual := string(a)
-
-	fail := false
-	if actual != expected {
-		fail = true
-	}
-
-	if testing.Verbose() || fail {
-		t.Log("Value    :", value)
-		t.Log("Expected :", expected)
-		t.Log("Actual   :", actual)
-	}
-
-	if fail {
-		t.Fail()
-	}
+func printWalkFunc(obj interface{}, level int) (ret interface{}) {
+	val := reflect.ValueOf(obj)
+	kind := val.Type().Kind()
+	fmt.Fprintf(w, "%s%+v (%s)\n", indent(level), val, kind)
+	return obj
 }
 
 func TestPrintInt(t *testing.T) {
 	value := 12
 	expected := `12 (int)
 `
+	w = &bytes.Buffer{}
+	Go(&value, printWalkFunc)
+	a, _ := ioutil.ReadAll(w)
 
-	comparePrint(t, value, expected)
+	if string(a) != expected {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+	}
 }
 
 func TestPrintStruct(t *testing.T) {
@@ -93,8 +68,12 @@ func TestPrintStruct(t *testing.T) {
 >>>> 5 (int)
 >>>> str (string)
 `
+	Go(&value, printWalkFunc)
+	a, _ := ioutil.ReadAll(w)
 
-	comparePrint(t, value, expected)
+	if string(a) != expected {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+	}
 }
 
 func TestPrintMap(t *testing.T) {
@@ -104,7 +83,12 @@ func TestPrintMap(t *testing.T) {
 >>>> 12 (int)
 `
 
-	comparePrint(t, value, expected)
+	Go(&value, printWalkFunc)
+	a, _ := ioutil.ReadAll(w)
+
+	if string(a) != expected {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+	}
 }
 
 func TestPrintSlice(t *testing.T) {
@@ -116,61 +100,113 @@ func TestPrintSlice(t *testing.T) {
 >>>> 4 (int)
 >>>> 5 (int)
 `
+	Go(&value, printWalkFunc)
+	a, _ := ioutil.ReadAll(w)
 
-	comparePrint(t, value, expected)
+	if string(a) != expected {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+	}
 }
 
 func incIntWalkFunc(v interface{}, l int) interface{} {
-	vv := reflect.ValueOf(v)
-	kind := vv.Type().Kind()
-
-	if kind == reflect.Int {
-		i := v.(int)
-		return i + 1
+	if i, ok := v.(int); ok {
+		i += +1
+		return i
 	}
 
-	return NoUpdate{}
+	return v
 }
 
 func TestIncInt(t *testing.T) {
-	tests := []struct {
-		title    string
-		value    interface{}
-		expected interface{}
-	}{
-		{
-			title:    "simple int",
-			value:    5,
-			expected: 6,
-		},
-		{
-			title:    "simple string",
-			value:    "asdf",
-			expected: NoUpdate{},
-		},
-		{
-			title:    "simple bool",
-			value:    false,
-			expected: NoUpdate{},
-		},
-		{
-			title:    "struct",
-			value:    SimpleStruct{B: false, I: 5, S: "str"},
-			expected: SimpleStruct{B: false, I: 6, S: "str"},
-		},
+	value := 5
+	expected := 6
+
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithString(t *testing.T) {
+	value := "asdf"
+	expected := "asdf"
+
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithStruct(t *testing.T) {
+	value := SimpleStruct{B: false, I: 5, S: "str"}
+	expected := SimpleStruct{B: false, I: 6, S: "str"}
+
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithMap(t *testing.T) {
+	value := map[string]int{"a": 5, "b": 10}
+	expected := map[string]int{"a": 6, "b": 11}
+
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithSlice(t *testing.T) {
+	value := []int{5, 10}
+	expected := []int{6, 11}
+
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithComplexStruct(t *testing.T) {
+	value := ComplexStruct{
+		SimpleStruct: SimpleStruct{I: 10},
+		A:            SimpleStruct2{I: 12},
 	}
 
-	walker, _ := NewWalker(incIntWalkFunc)
-
-	for _, test := range tests {
-		actual := walker.Go(test.value)
-
-		if !reflect.DeepEqual(test.expected, actual) {
-			t.Logf("Value    : %+v", test.value)
-			t.Logf("Expected : %+v", test.expected)
-			t.Logf("Actaul   : %+v", actual)
-			t.Fail()
-		}
+	expected := ComplexStruct{
+		SimpleStruct: SimpleStruct{I: 11},
+		A:            SimpleStruct2{I: 13},
 	}
 
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestIncIntWithMapComplexStruct(t *testing.T) {
+	value := map[int]ComplexStruct{
+		1: ComplexStruct{
+			SimpleStruct: SimpleStruct{I: 10},
+			A:            SimpleStruct2{I: 12},
+		},
+		2: ComplexStruct{
+			SimpleStruct: SimpleStruct{I: 20},
+			A:            SimpleStruct2{I: 22},
+		},
+	}
+	expected := map[int]ComplexStruct{
+		1: ComplexStruct{
+			SimpleStruct: SimpleStruct{I: 11},
+			A:            SimpleStruct2{I: 13},
+		},
+		2: ComplexStruct{
+			SimpleStruct: SimpleStruct{I: 21},
+			A:            SimpleStruct2{I: 23},
+		},
+	}
+	Go(&value, incIntWalkFunc)
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
 }

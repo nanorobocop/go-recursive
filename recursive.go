@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -10,11 +9,13 @@ import (
 // * value - currently walking value
 // * level - nested level, starting with 0
 // Return value - new value to update existing value, or NoUpdate{} if update not needed
-type WalkFunc func(value interface{}, level int) (updateVal interface{})
+type WalkFunc func(value interface{}, level int) (ret interface{})
 
 // NoUpdate specifies that there's no update to existing value.
 // It's distinguished from nil to allow setting nil as value.
 type NoUpdate struct{}
+
+var emptyValue = reflect.Value{}
 
 // Walker is main struct for recursive walking.
 // It contains walking options.
@@ -34,81 +35,137 @@ type Walker struct {
 	LeafOnly bool
 }
 
-func NewWalker(f WalkFunc) (*Walker, error) {
-	if f == nil {
-		return nil, fmt.Errorf("WalkFunc cannot be nil")
-	}
-
-	return &Walker{WalkFunc: f}, nil
-}
-
 // Go walks through nested object recursively and invokes WalkFunc.
 // It looks inside structs, maps, slices.
-func (w *Walker) Go(v interface{}) (ret interface{}) {
-	ret = NoUpdate{}
+// In order to update object, must call by pointer.
+func Go(obj interface{}, f WalkFunc) {
+	val := reflect.ValueOf(obj)
+	w := &Walker{
+		WalkFunc: f,
+	}
+	w.GoValue(val)
+}
 
-	vv := reflect.ValueOf(v)
-	kind := vv.Type().Kind()
+// GoValue walks through nested objects recursively.
+// Returns updated value and changed flag.
+func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
+	kind := elem.Kind()
 
-	if kindOf(LeafKinds, kind) {
-		if w.NodeOnly == false {
-			ret = w.WalkFunc(v, w.level)
+	elem2 := elem
+
+	for {
+		if kind == reflect.Interface {
+			elem2 = elem2.Elem()
+			kind = elem2.Kind()
+			if elem2.CanAddr() {
+				elem = elem2
+			}
+		} else {
+			break
 		}
+	}
 
-		return ret
+	if kindOf(LeafKinds, kind) && w.NodeOnly == false {
+		orig := elem.Interface()
+		ret := w.WalkFunc(orig, w.level)
+		if !reflect.DeepEqual(orig, ret) {
+			if elem.CanSet() {
+				elem.Set(reflect.ValueOf(ret))
+			} else {
+				return reflect.ValueOf(ret), true
+			}
+		}
+		return emptyValue, false
 	}
 
 	if kindOf(NodeKinds, kind) && w.LeafOnly == false {
-		ret = w.WalkFunc(v, w.level)
-		if !reflect.DeepEqual(ret, NoUpdate{}) {
-			return ret
+		orig := elem.Interface()
+		ret := w.WalkFunc(elem.Interface(), w.level)
+		if !reflect.DeepEqual(orig, ret) {
+			return emptyValue, true
 		}
 	}
-
-	w.level++
-	defer func() { w.level-- }()
 
 	switch kind {
 	case reflect.Struct:
-		num := vv.Type().NumField()
+		w.level++
+		defer func() { w.level-- }()
+
+		var newElemPtr reflect.Value
+
+		num := elem.NumField()
 		for i := 0; i < num; i++ {
-			if !vv.Field(i).CanInterface() {
+			val := elem.Field(i)
+
+			if !val.CanInterface() {
 				continue
 			}
 
-			ret := w.Go(vv.Field(i).Interface())
-			if reflect.DeepEqual(ret, NoUpdate{}) {
+			ret, changed := w.GoValue(val)
+			if !changed {
 				continue
 			}
 
-			if vv.Field(i).CanSet() {
-				vv.Field(i).Set(reflect.ValueOf(ret))
+			if val.CanSet() {
+				val.Set(ret)
+				continue
 			}
+
+			if newElemPtr == emptyValue {
+				newElemPtr = copyStruct(elem)
+			}
+
+			newElemPtr.Elem().Field(i).Set(ret)
 		}
+		if newElemPtr != emptyValue {
+			return newElemPtr.Elem(), true
+		}
+		return emptyValue, false
 	case reflect.Map:
-		iter := vv.MapRange()
+		w.level++
+		defer func() { w.level-- }()
+		iter := elem.MapRange()
 		for iter.Next() {
-			//k := iter.Key()
-			v := iter.Value()
-			if !v.CanInterface() {
+			key := iter.Key()
+			val := iter.Value()
+
+			if !val.CanInterface() {
 				continue
 			}
 
-			w.Go(v.Interface())
+			ret, changed := w.GoValue(val)
+			if !changed {
+				continue
+			}
+
+			elem.SetMapIndex(key, ret)
 		}
 	case reflect.Slice:
-		n := vv.Len()
+		w.level++
+		defer func() { w.level-- }()
+		n := elem.Len()
 		for i := 0; i < n; i++ {
-			elem := vv.Index(i)
-			if !elem.CanInterface() {
+			val := elem.Index(i)
+			if !val.CanInterface() {
 				continue
 			}
 
-			w.Go(elem.Interface())
+			ret, changed := w.GoValue(val)
+			if !changed {
+				continue
+			}
+
+			val.Set(ret)
 		}
+	case reflect.Ptr:
+		if elem.IsZero() {
+			break
+		}
+		val := elem.Elem()
+		w.GoValue(val)
 	}
 
-	return NoUpdate{}
+	return reflect.Value{}, false
 }
 
 var (
@@ -146,4 +203,18 @@ func kindOf(kinds []reflect.Kind, kind reflect.Kind) bool {
 		}
 	}
 	return false
+}
+
+// copyStruct copies struct to new one.
+// Returns pointer to new struct.
+// Used when original struct is not addressable.
+func copyStruct(v reflect.Value) reflect.Value {
+	res := reflect.New(v.Type())
+
+	num := v.NumField()
+	for i := 0; i < num; i++ {
+		val := v.Field(i)
+		res.Elem().Field(i).Set(val)
+	}
+	return res
 }
