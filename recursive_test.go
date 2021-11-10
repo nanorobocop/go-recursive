@@ -210,3 +210,13 @@ func TestIncIntWithMapComplexStruct(t *testing.T) {
 		t.Errorf("Expected: %+v, actual: %+v", expected, value)
 	}
 }
+
+func TestCopyStruct(t *testing.T) {
+	s := SimpleStruct{B: true, I: 1, S: "s", X: &str}
+
+	s2 := CopyStruct(reflect.ValueOf(s)).Interface().(*SimpleStruct)
+
+	if !reflect.DeepEqual(s, *s2) {
+		t.Errorf("Expected: %+v\nActual: %+v", s, *s2)
+	}
+}

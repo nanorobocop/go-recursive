@@ -115,7 +115,7 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 			}
 
 			if newElemPtr == emptyValue {
-				newElemPtr = copyStruct(elem)
+				newElemPtr = CopyStruct(elem)
 			}
 
 			newElemPtr.Elem().Field(i).Set(ret)
@@ -198,10 +198,10 @@ func kindOf(kinds []reflect.Kind, kind reflect.Kind) bool {
 	return false
 }
 
-// copyStruct copies struct to new one.
+// CopyStruct copies struct to new one.
 // Returns pointer to new struct.
 // Used when original struct is not addressable.
-func copyStruct(v reflect.Value) reflect.Value {
+func CopyStruct(v reflect.Value) reflect.Value {
 	res := reflect.New(v.Type())
 
 	num := v.NumField()
