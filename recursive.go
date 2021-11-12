@@ -64,7 +64,7 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 		orig := elem.Interface()
 		ret := w.WalkFunc(elem.Interface(), w.level)
 		if !reflect.DeepEqual(orig, ret) {
-			return emptyValue, true
+			return reflect.ValueOf(ret), true
 		}
 	}
 
@@ -158,7 +158,7 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 		}
 	}
 
-	return reflect.Value{}, false
+	return emptyValue, false
 }
 
 var (

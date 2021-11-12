@@ -211,6 +211,35 @@ func TestIncIntWithMapComplexStruct(t *testing.T) {
 	}
 }
 
+func updateStruct(i interface{}, level int) interface{} {
+	s, ok := i.(SimpleStruct)
+	if !ok {
+		return i
+	}
+
+	s.I += 1
+	return s
+}
+
+func TestUpdateStruct(t *testing.T) {
+	s := map[int]SimpleStruct{
+		1: SimpleStruct{B: true, I: 1, S: "s", X: &str},
+		2: SimpleStruct{},
+	}
+
+	expected := map[int]SimpleStruct{
+		1: SimpleStruct{B: true, I: 2, S: "s", X: &str},
+		2: SimpleStruct{I: 1},
+	}
+
+	Go(&s, updateStruct)
+
+	if !reflect.DeepEqual(s, expected) {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, s)
+	}
+
+}
+
 func TestCopyStruct(t *testing.T) {
 	s := SimpleStruct{B: true, I: 1, S: "s", X: &str}
 
