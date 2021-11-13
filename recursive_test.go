@@ -29,6 +29,11 @@ type ComplexStruct struct {
 	A            SimpleStruct2 // nested struct
 }
 
+type NestedStruct struct {
+	Int    int
+	Nested *NestedStruct
+}
+
 func indent(level int) (indent string) {
 	if level == 0 {
 		return ""
@@ -125,7 +130,7 @@ func TestPrintComplex(t *testing.T) {
 >>>>>>>> true (bool)
 >>>>>>>> 5 (int)
 >>>>>>>> str (string)
->>>>>>>> str (string)
+>>>>>>>>>>>> str (string)
 >>>> {I:10} (struct)
 >>>>>>>> 10 (int)
 `
@@ -237,6 +242,26 @@ func TestIncIntWithMapComplexStruct(t *testing.T) {
 	Go(&value, incIntWalkFunc)
 	if !reflect.DeepEqual(value, expected) {
 		t.Errorf("Expected: %+v, actual: %+v", expected, value)
+	}
+}
+
+func TestNestedStruct(t *testing.T) {
+	n := NestedStruct{Int: 20}
+	s := map[int]NestedStruct{
+		1: NestedStruct{Int: 10, Nested: &n},
+		2: NestedStruct{},
+	}
+
+	expected := map[int]NestedStruct{
+		1: NestedStruct{Int: 11, Nested: &NestedStruct{Int: 21}},
+		2: NestedStruct{Int: 1},
+	}
+
+	Go(&s, incIntWalkFunc)
+
+	if !reflect.DeepEqual(s, expected) || !reflect.DeepEqual(s[1].Nested, expected[1].Nested) {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, s)
+		t.Errorf("Expected: %+v\nActual: %+v", expected[1].Nested, s[1].Nested)
 	}
 }
 

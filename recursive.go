@@ -39,7 +39,7 @@ func Go(obj interface{}, f WalkFunc) {
 	w := &Walker{
 		WalkFunc: f,
 	}
-	w.GoValue(val)
+	w.GoValue(val.Elem())
 }
 
 // GoValue walks through nested objects recursively.
@@ -81,12 +81,6 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 			return emptyValue, false
 		}
 		return ret, true
-	case reflect.Ptr:
-		if elem.IsZero() {
-			break
-		}
-		val := elem.Elem()
-		w.GoValue(val)
 	}
 
 	w.level++
@@ -154,6 +148,15 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 				continue
 			}
 
+			val.Set(ret)
+		}
+	case reflect.Ptr:
+		if elem.IsZero() {
+			break
+		}
+		val := elem.Elem()
+		ret, changed := w.GoValue(val)
+		if changed {
 			val.Set(ret)
 		}
 	}
