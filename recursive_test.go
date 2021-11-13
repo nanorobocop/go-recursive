@@ -57,7 +57,7 @@ func TestPrintInt(t *testing.T) {
 	a, _ := ioutil.ReadAll(w)
 
 	if string(a) != expected {
-		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
 	}
 }
 
@@ -72,7 +72,7 @@ func TestPrintStruct(t *testing.T) {
 	a, _ := ioutil.ReadAll(w)
 
 	if string(a) != expected {
-		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
 	}
 }
 
@@ -87,7 +87,7 @@ func TestPrintMap(t *testing.T) {
 	a, _ := ioutil.ReadAll(w)
 
 	if string(a) != expected {
-		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
 	}
 }
 
@@ -104,7 +104,36 @@ func TestPrintSlice(t *testing.T) {
 	a, _ := ioutil.ReadAll(w)
 
 	if string(a) != expected {
-		t.Errorf("Expected: %+v\nActual: %+v", expected, value)
+		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
+	}
+}
+
+func TestPrintComplex(t *testing.T) {
+	value := ComplexStruct{
+		SimpleStruct: SimpleStruct{
+			B: true,
+			I: 5,
+			S: "str",
+			X: &str,
+		},
+		A: SimpleStruct2{
+			I: 10,
+		},
+	}
+	expected := `{SimpleStruct:{B:true I:5 S:str X:0x11f7460} A:{I:10}} (struct)
+>>>> {B:true I:5 S:str X:0x11f7460} (struct)
+>>>>>>>> true (bool)
+>>>>>>>> 5 (int)
+>>>>>>>> str (string)
+>>>>>>>> str (string)
+>>>> {I:10} (struct)
+>>>>>>>> 10 (int)
+`
+	Go(&value, printWalkFunc)
+	a, _ := ioutil.ReadAll(w)
+
+	if string(a) != expected {
+		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
 	}
 }
 
@@ -237,7 +266,6 @@ func TestUpdateStruct(t *testing.T) {
 	if !reflect.DeepEqual(s, expected) {
 		t.Errorf("Expected: %+v\nActual: %+v", expected, s)
 	}
-
 }
 
 func TestCopyStruct(t *testing.T) {
