@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -72,6 +73,7 @@ func TestPrintStruct(t *testing.T) {
 >>>> false (bool)
 >>>> 5 (int)
 >>>> str (string)
+>>>> <nil> (ptr)
 `
 	Go(&value, printWalkFunc)
 	a, _ := ioutil.ReadAll(w)
@@ -125,19 +127,21 @@ func TestPrintComplex(t *testing.T) {
 			I: 10,
 		},
 	}
-	expected := `{SimpleStruct:{B:true I:5 S:str X:0x11f7460} A:{I:10}} (struct)
->>>> {B:true I:5 S:str X:0x11f7460} (struct)
->>>>>>>> true (bool)
->>>>>>>> 5 (int)
->>>>>>>> str (string)
->>>>>>>>>>>> str (string)
->>>> {I:10} (struct)
->>>>>>>> 10 (int)
+	expected := `{SimpleStruct:{B:true I:5 S:str X:0x[0-9a-f]{7}} A:{I:10}} \(struct\)
+>>>> {B:true I:5 S:str X:0x[0-9a-f]{7}} \(struct\)
+>>>>>>>> true \(bool\)
+>>>>>>>> 5 \(int\)
+>>>>>>>> str \(string\)
+>>>>>>>> 0x[0-9a-f]{7} \(ptr\)
+>>>>>>>>>>>> str \(string\)
+>>>> {I:10} \(struct\)
+>>>>>>>> 10 \(int\)
 `
 	Go(&value, printWalkFunc)
 	a, _ := ioutil.ReadAll(w)
 
-	if string(a) != expected {
+	match, _ := regexp.MatchString(expected, string(a))
+	if !match {
 		t.Errorf("Expected: %+v\nActual: %+v", expected, string(a))
 	}
 }
