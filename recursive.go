@@ -68,21 +68,6 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 		}
 	}
 
-	switch kind {
-	case reflect.Interface:
-		elem = elem.Elem()
-		ret, changed := w.GoValue(elem)
-		if !changed {
-			return emptyValue, false
-		}
-
-		if elem.CanSet() {
-			elem.Set(ret)
-			return emptyValue, false
-		}
-		return ret, true
-	}
-
 	w.level++
 	defer func() { w.level-- }()
 
@@ -159,6 +144,18 @@ func (w *Walker) GoValue(elem reflect.Value) (reflect.Value, bool) {
 		if changed {
 			val.Set(ret)
 		}
+	case reflect.Interface:
+		elem = elem.Elem()
+		ret, changed := w.GoValue(elem)
+		if !changed {
+			return emptyValue, false
+		}
+
+		if elem.CanSet() {
+			elem.Set(ret)
+			return emptyValue, false
+		}
+		return ret, true
 	}
 
 	return emptyValue, false
@@ -182,14 +179,14 @@ var (
 		reflect.Complex64,
 		reflect.Complex128,
 		reflect.Func,
-		reflect.Interface,
 		reflect.String}
 
 	NodeKinds = []reflect.Kind{reflect.Map,
 		reflect.Slice,
-		reflect.Struct}
-
-	PointerKind = []reflect.Kind{reflect.Ptr}
+		reflect.Struct,
+		reflect.Interface,
+		reflect.Ptr,
+	}
 )
 
 func kindOf(kinds []reflect.Kind, kind reflect.Kind) bool {
