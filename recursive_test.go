@@ -15,14 +15,14 @@ var (
 )
 
 type SimpleStruct struct {
-	B bool
-	I int
-	S string
-	X *string
+	Bool bool
+	Int  int
+	Str  string
+	Ptr  *string
 }
 
 type SimpleStruct2 struct {
-	I int
+	Int int
 }
 
 type ComplexStruct struct {
@@ -51,7 +51,7 @@ func printWalkFunc(obj interface{}, level int) (ret interface{}) {
 	val := reflect.ValueOf(obj)
 	kind := val.Type().Kind()
 	fmt.Fprintf(w, "%s%+v (%s)\n", indent(level), val, kind)
-	return obj
+	return obj // return unchanged
 }
 
 func TestPrintInt(t *testing.T) {
@@ -68,8 +68,8 @@ func TestPrintInt(t *testing.T) {
 }
 
 func TestPrintStruct(t *testing.T) {
-	value := SimpleStruct{B: false, I: 5, S: "str", X: nil}
-	expected := `{B:false I:5 S:str X:<nil>} (struct)
+	value := SimpleStruct{Bool: false, Int: 5, Str: "str", Ptr: nil}
+	expected := `{Bool:false Int:5 Str:str Ptr:<nil>} (struct)
 >>>> false (bool)
 >>>> 5 (int)
 >>>> str (string)
@@ -118,23 +118,23 @@ func TestPrintSlice(t *testing.T) {
 func TestPrintComplex(t *testing.T) {
 	value := ComplexStruct{
 		SimpleStruct: SimpleStruct{
-			B: true,
-			I: 5,
-			S: "str",
-			X: &str,
+			Bool: true,
+			Int:  5,
+			Str:  "str",
+			Ptr:  &str,
 		},
 		A: SimpleStruct2{
-			I: 10,
+			Int: 10,
 		},
 	}
-	expected := `{SimpleStruct:{B:true I:5 S:str X:0x[0-9a-f]{7}} A:{I:10}} \(struct\)
->>>> {B:true I:5 S:str X:0x[0-9a-f]{7}} \(struct\)
+	expected := `{SimpleStruct:{Bool:true Int:5 Str:str Ptr:0x[0-9a-f]{7}} A:{Int:10}} \(struct\)
+>>>> {Bool:true Int:5 Str:str Ptr:0x[0-9a-f]{7}} \(struct\)
 >>>>>>>> true \(bool\)
 >>>>>>>> 5 \(int\)
 >>>>>>>> str \(string\)
 >>>>>>>> 0x[0-9a-f]{7} \(ptr\)
 >>>>>>>>>>>> str \(string\)
->>>> {I:10} \(struct\)
+>>>> {Int:10} \(struct\)
 >>>>>>>> 10 \(int\)
 `
 	Go(&value, printWalkFunc)
@@ -176,8 +176,8 @@ func TestIncIntWithString(t *testing.T) {
 }
 
 func TestIncIntWithStruct(t *testing.T) {
-	value := SimpleStruct{B: false, I: 5, S: "str"}
-	expected := SimpleStruct{B: false, I: 6, S: "str"}
+	value := SimpleStruct{Bool: false, Int: 5, Str: "str"}
+	expected := SimpleStruct{Bool: false, Int: 6, Str: "str"}
 
 	Go(&value, incIntWalkFunc)
 	if !reflect.DeepEqual(value, expected) {
@@ -207,13 +207,13 @@ func TestIncIntWithSlice(t *testing.T) {
 
 func TestIncIntWithComplexStruct(t *testing.T) {
 	value := ComplexStruct{
-		SimpleStruct: SimpleStruct{I: 10},
-		A:            SimpleStruct2{I: 12},
+		SimpleStruct: SimpleStruct{Int: 10},
+		A:            SimpleStruct2{Int: 12},
 	}
 
 	expected := ComplexStruct{
-		SimpleStruct: SimpleStruct{I: 11},
-		A:            SimpleStruct2{I: 13},
+		SimpleStruct: SimpleStruct{Int: 11},
+		A:            SimpleStruct2{Int: 13},
 	}
 
 	Go(&value, incIntWalkFunc)
@@ -225,22 +225,22 @@ func TestIncIntWithComplexStruct(t *testing.T) {
 func TestIncIntWithMapComplexStruct(t *testing.T) {
 	value := map[int]ComplexStruct{
 		1: ComplexStruct{
-			SimpleStruct: SimpleStruct{I: 10},
-			A:            SimpleStruct2{I: 12},
+			SimpleStruct: SimpleStruct{Int: 10},
+			A:            SimpleStruct2{Int: 12},
 		},
 		2: ComplexStruct{
-			SimpleStruct: SimpleStruct{I: 20},
-			A:            SimpleStruct2{I: 22},
+			SimpleStruct: SimpleStruct{Int: 20},
+			A:            SimpleStruct2{Int: 22},
 		},
 	}
 	expected := map[int]ComplexStruct{
 		1: ComplexStruct{
-			SimpleStruct: SimpleStruct{I: 11},
-			A:            SimpleStruct2{I: 13},
+			SimpleStruct: SimpleStruct{Int: 11},
+			A:            SimpleStruct2{Int: 13},
 		},
 		2: ComplexStruct{
-			SimpleStruct: SimpleStruct{I: 21},
-			A:            SimpleStruct2{I: 23},
+			SimpleStruct: SimpleStruct{Int: 21},
+			A:            SimpleStruct2{Int: 23},
 		},
 	}
 	Go(&value, incIntWalkFunc)
@@ -275,19 +275,19 @@ func updateStruct(i interface{}, level int) interface{} {
 		return i
 	}
 
-	s.I += 1
+	s.Int += 1
 	return s
 }
 
 func TestUpdateStruct(t *testing.T) {
 	s := map[int]SimpleStruct{
-		1: SimpleStruct{B: true, I: 1, S: "s", X: &str},
+		1: SimpleStruct{Bool: true, Int: 1, Str: "s", Ptr: &str},
 		2: SimpleStruct{},
 	}
 
 	expected := map[int]SimpleStruct{
-		1: SimpleStruct{B: true, I: 2, S: "s", X: &str},
-		2: SimpleStruct{I: 1},
+		1: SimpleStruct{Bool: true, Int: 2, Str: "s", Ptr: &str},
+		2: SimpleStruct{Int: 1},
 	}
 
 	Go(&s, updateStruct)
@@ -298,7 +298,7 @@ func TestUpdateStruct(t *testing.T) {
 }
 
 func TestCopyStruct(t *testing.T) {
-	s := SimpleStruct{B: true, I: 1, S: "s", X: &str}
+	s := SimpleStruct{Bool: true, Int: 1, Str: "s", Ptr: &str}
 
 	s2 := CopyStruct(reflect.ValueOf(s)).Interface().(*SimpleStruct)
 
