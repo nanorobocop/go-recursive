@@ -1,5 +1,7 @@
 # Go-recursive - Walk and update nested Go objects
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/nanorobocop/go-recursive.svg)](https://pkg.go.dev/github.com/nanorobocop/go-recursive)
+
 Go-recursive is Golang library to walk through and update nested objects.
 It goes down structs, maps, slices recursively.
 
