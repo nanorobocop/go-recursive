@@ -152,7 +152,7 @@ func incIntWalkFunc(v interface{}, l int) interface{} {
 		return i
 	}
 
-	return v
+	return v // return unchanged
 }
 
 func TestIncInt(t *testing.T) {
