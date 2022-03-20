@@ -127,12 +127,12 @@ func TestPrintComplex(t *testing.T) {
 			Int: 10,
 		},
 	}
-	expected := `{SimpleStruct:{Bool:true Int:5 Str:str Ptr:0x[0-9a-f]{7}} A:{Int:10}} \(struct\)
->>>> {Bool:true Int:5 Str:str Ptr:0x[0-9a-f]{7}} \(struct\)
+	expected := `{SimpleStruct:{Bool:true Int:5 Str:str Ptr:0x[0-9a-f]+} A:{Int:10}} \(struct\)
+>>>> {Bool:true Int:5 Str:str Ptr:0x[0-9a-f]+} \(struct\)
 >>>>>>>> true \(bool\)
 >>>>>>>> 5 \(int\)
 >>>>>>>> str \(string\)
->>>>>>>> 0x[0-9a-f]{7} \(ptr\)
+>>>>>>>> 0x[0-9a-f]+ \(ptr\)
 >>>>>>>>>>>> str \(string\)
 >>>> {Int:10} \(struct\)
 >>>>>>>> 10 \(int\)
